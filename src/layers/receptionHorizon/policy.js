@@ -1,6 +1,9 @@
+import { msg } from '../../i18n/marker.js';
+
 export const LAYER_ID = 'reception-horizon';
-export const LAYER_NAME = 'Reception Horizon';
-export const LAYER_SOURCE = 'Your receiver · this session';
+export const LAYER_NAME = msg('Reception Horizon');
+/** English data; the Layers panel translates each ` · ` piece. */
+export const LAYER_SOURCE = `${msg('Your receiver')} · ${msg('this session')}`;
 export const ENTITY_PREFIX = `${LAYER_ID}:`;
 
 /**
@@ -47,7 +50,7 @@ export const HORIZON_ANTENNA_EPSILON_M = 25;
 export const HORIZON_BANDS = Object.freeze([
   Object.freeze({
     id: 'below-5k',
-    label: 'Below 5,000 ft',
+    label: msg('Below 5,000 ft'),
     shortLabel: '<5k ft',
     minFt: -Infinity,
     maxFt: 5_000,
@@ -57,7 +60,7 @@ export const HORIZON_BANDS = Object.freeze([
   }),
   Object.freeze({
     id: '5k-15k',
-    label: '5,000–15,000 ft',
+    label: msg('5,000–15,000 ft'),
     shortLabel: '5–15k',
     minFt: 5_000,
     maxFt: 15_000,
@@ -67,7 +70,7 @@ export const HORIZON_BANDS = Object.freeze([
   }),
   Object.freeze({
     id: '15k-25k',
-    label: '15,000–25,000 ft',
+    label: msg('15,000–25,000 ft'),
     shortLabel: '15–25k',
     minFt: 15_000,
     maxFt: 25_000,
@@ -77,7 +80,7 @@ export const HORIZON_BANDS = Object.freeze([
   }),
   Object.freeze({
     id: '25k-35k',
-    label: '25,000–35,000 ft',
+    label: msg('25,000–35,000 ft'),
     shortLabel: '25–35k',
     minFt: 25_000,
     maxFt: 35_000,
@@ -87,7 +90,7 @@ export const HORIZON_BANDS = Object.freeze([
   }),
   Object.freeze({
     id: 'above-35k',
-    label: '35,000 ft and above',
+    label: msg('35,000 ft and above'),
     shortLabel: '35k+ ft',
     minFt: 35_000,
     maxFt: Infinity,
@@ -99,7 +102,7 @@ export const HORIZON_BANDS = Object.freeze([
 
 export const ANTENNA_COLOR = '#ffffff';
 export const ANTENNA_SOURCE_LABELS = Object.freeze({
-  manual: 'set at view centre',
-  feed: 'decoder receiver.json',
-  browser: 'browser location (LOCATE)',
+  manual: msg('set on the map'),
+  feed: msg('decoder receiver.json'),
+  browser: msg('browser location (LOCATE)'),
 });

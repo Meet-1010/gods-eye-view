@@ -418,7 +418,7 @@ async function main() {
     const rowText = await row?.evaluate((node) => node.innerText);
     check(
       /SET ANTENNA/.test(rowText || '') &&
-        /35k\+ ft \d+ km/.test(rowText || ''),
+        /35k\+ ft \d+\u00a0km/.test(rowText || ''),
       'Data Layers row shows the chips and the per-band ranges',
       rowText,
     );

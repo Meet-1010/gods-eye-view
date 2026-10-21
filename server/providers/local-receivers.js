@@ -573,6 +573,7 @@ export function createLocalReceiversHandler({
     return async function respond(req, res) {
       if (req.method !== 'GET' && req.method !== 'HEAD') {
         res.writeHead(405, {
+          Allow: 'GET, HEAD',
           'Content-Type': 'application/json',
           'Cache-Control': 'no-store',
         });

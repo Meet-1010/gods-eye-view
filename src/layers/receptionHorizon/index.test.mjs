@@ -4,6 +4,7 @@ import * as Cesium from 'cesium';
 
 import { destinationPointDeg } from '../alpr/model.js';
 import { layerFeedState } from '../../data/feedState.js';
+import { setLocale } from '../../i18n/index.js';
 import {
   createHorizonModel,
   createReceptionHorizonLayer,
@@ -208,16 +209,16 @@ test('positions heard before the layer is on are drawn once it is', async (t) =>
   const stats = layer.getStats();
   assert.equal(stats.countLabel, '206\u00a0km');
   assert.equal(stats.count, 4);
-  assert.match(stats.source, /antenna from 1090 MHz receiver\.json/);
+  assert.equal(stats.source, 'Your receiver · this session');
   assert.equal(layerFeedState(stats), 'nominal');
   const controls = layer.getRowControls();
   assert.deepEqual(
     controls.legend.map(({ label }) => label),
-    ['<5k ft', '5–15k', '15–25k', '25–35k 206 km', '35k+ ft'],
+    ['<5k ft', '5–15k', '15–25k', '25–35k 206\u00a0km', '35k+ ft'],
   );
   assert.match(
     controls.info,
-    /4 positions from 1 aircraft · farthest 206 km \(111 NM\) at 6°, FL300/,
+    /4 positions from 1 aircraft · farthest 206\u00a0km \(111\u00a0NM\) at 6°, FL300/,
   );
 });
 
@@ -361,7 +362,7 @@ test('the info line names what was ignored and formats altitude like the HUD', (
   });
   assert.equal(
     info,
-    'Antenna: browser location (LOCATE) · 1 position from 1 aircraft · farthest 95 km (51 NM) at 270°, 12,500 ft · 1 position beyond line of sight ignored',
+    'Antenna: browser location (LOCATE) · 1 position from 1 aircraft · farthest 95\u00a0km (51\u00a0NM) at 270°, 12,500\u00a0ft · 1 position beyond line of sight ignored',
   );
 });
 
@@ -411,4 +412,58 @@ test('drawn heights are barometric feet in metres, scaled for display only', () 
   assert.equal(horizonHeightM(10_000), 3_048);
   assert.equal(horizonHeightM(10_000, 10), 30_480);
   assert.equal(horizonHeightM(-500), 0, 'never below the ellipsoid');
+});
+
+test('an antenna set by a click on the globe says so', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const { layer, click } = harness({ receivers: [FEED] });
+  t.after(() => layer.destroy());
+  await layer.enable();
+  layer.armAntennaPlacement();
+  click();
+  assert.match(layer.getRowControls().info, /^Antenna: set on the map · /);
+});
+
+test('the row follows the UI language, plural forms included', async (t) => {
+  t.after(() => setLocale('en'));
+  setLocale('ru');
+  const model = createHorizonModel();
+  model.setAntenna(ANTENNA);
+  for (const [bearing, icao] of [
+    [10, 'a'],
+    [15, 'b'],
+    [20, 'c'],
+    [25, 'd'],
+    [30, 'e'],
+  ])
+    model.ingest(fixAt(bearing, 120, 30_000, icao));
+  const info = receptionHorizonInfo(model.snapshot(), {
+    ...ANTENNA,
+    source: 'manual',
+    feedLabel: null,
+  });
+  assert.match(
+    info,
+    /^Антенна: задана на карте · 5 позиций от 5 воздушных судов · /,
+  );
+  assert.match(info, /самая дальняя — 120\u00a0km/);
+  assert.equal(
+    receptionHorizonInfo(model.snapshot(), null),
+    'Нужно положение антенны: «ГЕОПОЗИЦИЯ» в карточке «Радио», местоположение в receiver.json вашего декодера или «ЗАДАТЬ АНТЕННУ».',
+  );
+
+  const { layer } = harness({ receivers: [FEED] });
+  t.after(() => layer.destroy());
+  await layer.enable();
+  const controls = layer.getRowControls();
+  assert.deepEqual(
+    controls.chips.map(({ label }) => label),
+    ['ЗАДАТЬ АНТЕННУ', 'ВЫСОТА ×10', 'СБРОС'],
+  );
+  assert.equal(
+    controls.legend[0].blurb,
+    'Ниже 5000 ft: пока ничего не принято.',
+  );
+  setLocale('en');
+  assert.equal(layer.getRowControls().chips[0].label, 'SET ANTENNA');
 });

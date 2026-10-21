@@ -1,4 +1,5 @@
 import * as Cesium from 'cesium';
+import { formatNumber, msg, t, tn } from '../../i18n/index.js';
 import { resolveAntenna } from './antenna.js';
 import { createHorizonModel, validAntennaPosition } from './model.js';
 import {
@@ -18,33 +19,38 @@ export { createReceiverPositionSource, resolveAntenna } from './antenna.js';
 const POINTER_OWNER = 'reception-horizon';
 const KM_PER_NM = 1.852;
 
-function count(n, singular, plural = `${singular}s`) {
-  return `${n.toLocaleString('en-US')} ${n === 1 ? singular : plural}`;
+const NBSP = ' ';
+
+/** A count for `{count}` placeholders, in the active language's digits. */
+function countValue(n) {
+  return { count: formatNumber(n) };
 }
 
+/** Units (km, NM, ft, FL) are symbols and stay as they are; numbers localize. */
 function formatKm(km) {
-  return `${Math.round(km).toLocaleString('en-US')} km`;
+  return `${formatNumber(Math.round(km))}${NBSP}km`;
 }
 
 function formatRange(km) {
-  return `${formatKm(km)} (${Math.round(km / KM_PER_NM).toLocaleString('en-US')} NM)`;
+  return `${formatKm(km)} (${formatNumber(Math.round(km / KM_PER_NM))}${NBSP}NM)`;
 }
 
 function formatAltitude(feet) {
   return feet >= 18_000
     ? `FL${String(Math.round(feet / 100)).padStart(3, '0')}`
-    : `${Math.round(feet).toLocaleString('en-US')} ft`;
+    : `${formatNumber(Math.round(feet))}${NBSP}ft`;
 }
 
 function antennaLabel(antenna) {
   if (!antenna) return null;
   if (antenna.source === 'feed' && antenna.feedLabel)
     return `${antenna.feedLabel} receiver.json`;
-  return ANTENNA_SOURCE_LABELS[antenna.source] || antenna.source;
+  const key = ANTENNA_SOURCE_LABELS[antenna.source];
+  return key ? t(key) : antenna.source;
 }
 
 /**
- * The row's one-line readout. Pure, for tests.
+ * The row's one-line readout, in the active language. Pure, for tests.
  * @param {object} snapshot Horizon snapshot.
  * @param {object|null} antenna Resolved antenna.
  * @param {object} [state] `{ armed, pointerBlocked, verticalScale }`.
@@ -55,31 +61,61 @@ export function receptionHorizonInfo(
   antenna,
   { armed = false, pointerBlocked = false, verticalScale = 1 } = {},
 ) {
-  if (armed) return 'Click your antenna on the globe (Esc cancels).';
+  if (armed) return t('Click your antenna on the globe (Esc cancels).');
   if (pointerBlocked)
-    return 'Another tool is using map clicks. Finish it, then SET ANTENNA.';
+    return t('Another tool is using map clicks. Finish it, then SET ANTENNA.');
   if (!antenna) {
-    const waiting = snapshot.pending
-      ? ` ${count(snapshot.pending, 'position')} waiting.`
-      : '';
-    return `Needs your antenna position: LOCATE in the Radio card, a location in your decoder's receiver.json, or SET ANTENNA.${waiting}`;
+    const ask = t(
+      "Needs your antenna position: LOCATE in the Radio card, a location in your decoder's receiver.json, or SET ANTENNA.",
+    );
+    if (!snapshot.pending) return ask;
+    const waiting = tn(
+      snapshot.pending,
+      '{count} position waiting.',
+      '{count} positions waiting.',
+      countValue(snapshot.pending),
+    );
+    return `${ask} ${waiting}`;
   }
-  const parts = [`Antenna: ${antennaLabel(antenna)}`];
-  if (!snapshot.counted) parts.push('waiting for aircraft from Local ADS-B');
+  const parts = [t('Antenna: {source}', { source: antennaLabel(antenna) })];
+  if (!snapshot.counted) parts.push(t('waiting for aircraft from Local ADS-B'));
   else
     parts.push(
-      `${count(snapshot.counted, 'position')} from ${count(snapshot.aircraft, 'aircraft', 'aircraft')}`,
+      t('{positions} from {aircraft}', {
+        positions: tn(
+          snapshot.counted,
+          '{count} position',
+          '{count} positions',
+          countValue(snapshot.counted),
+        ),
+        aircraft: tn(
+          snapshot.aircraft,
+          '{count} aircraft',
+          '{count} aircraft',
+          countValue(snapshot.aircraft),
+        ),
+      }),
     );
   const far = snapshot.farthest;
   if (far)
     parts.push(
-      `farthest ${formatRange(far.rangeKm)} at ${Math.round(far.bearingDeg) % 360}°, ${formatAltitude(far.altitudeFt)}`,
+      t('farthest {range} at {bearing}°, {altitude}', {
+        range: formatRange(far.rangeKm),
+        bearing: formatNumber(Math.round(far.bearingDeg) % 360),
+        altitude: formatAltitude(far.altitudeFt),
+      }),
     );
   if (snapshot.implausible)
     parts.push(
-      `${count(snapshot.implausible, 'position')} beyond line of sight ignored`,
+      tn(
+        snapshot.implausible,
+        '{count} position beyond line of sight ignored',
+        '{count} positions beyond line of sight ignored',
+        countValue(snapshot.implausible),
+      ),
     );
-  if (verticalScale !== 1) parts.push(`heights ×${verticalScale} for display`);
+  if (verticalScale !== 1)
+    parts.push(t('heights ×{scale} for display', { scale: verticalScale }));
   return parts.join(' · ');
 }
 
@@ -379,18 +415,16 @@ export function createReceptionHorizonLayer({
       const waiting = !antenna || !snapshot.counted;
       return {
         count: snapshot.counted,
-        // A no-break space keeps "435 km" on one line in the narrow row.
-        ...(far ? { countLabel: formatKm(far.rangeKm).replace(' ', ' ') } : {}),
+        ...(far ? { countLabel: formatKm(far.rangeKm) } : {}),
         lastUpdate: snapshot.lastFixAt,
-        source: antenna
-          ? `${LAYER_SOURCE} · antenna from ${antennaLabel(antenna)}`
-          : LAYER_SOURCE,
+        // English data: the Layers panel translates source and statusMessage.
+        source: LAYER_SOURCE,
         ...(waiting
           ? {
               status: 'idle',
               statusMessage: antenna
-                ? 'Waiting for aircraft heard by Local ADS-B'
-                : 'Needs your antenna position',
+                ? msg('Waiting for aircraft heard by Local ADS-B')
+                : msg('Needs your antenna position'),
             }
           : {}),
       };
@@ -401,41 +435,47 @@ export function createReceptionHorizonLayer({
       const chips = [
         {
           id: 'antenna-set',
-          label: armed ? 'CLICK MAP' : 'SET ANTENNA',
+          label: armed ? t('CLICK MAP') : t('SET ANTENNA'),
           active: armed,
           state: armed ? 'active' : 'idle',
           title: armed
-            ? 'Click your antenna on the globe (click again or Esc to cancel)'
-            : 'Then click the globe where your antenna is',
+            ? t(
+                'Click your antenna on the globe (click again or Esc to cancel)',
+              )
+            : t('Then click the globe where your antenna is'),
           onClick: arm,
         },
       ];
       if (manual)
         chips.push({
           id: 'antenna-auto',
-          label: 'AUTO',
+          label: t('AUTO'),
           state: 'idle',
-          title:
+          title: t(
             "Use the decoder's receiver.json or the Radio card LOCATE again",
+          ),
           onClick: useAutomaticAntenna,
         });
       const stretched = verticalScale !== 1;
       chips.push({
         id: 'height',
-        label: `HEIGHT ×${HORIZON_HEIGHT_EXAGGERATION}`,
+        label: t('HEIGHT ×{scale}', { scale: HORIZON_HEIGHT_EXAGGERATION }),
         active: stretched,
         state: stretched ? 'active' : 'idle',
         title: stretched
-          ? 'Draw heights at true scale again'
-          : `Stretch heights ×${HORIZON_HEIGHT_EXAGGERATION} so the shell's steps read in 3D (ranges are unchanged)`,
+          ? t('Draw heights at true scale again')
+          : t(
+              "Stretch heights ×{scale} so the shell's steps read in 3D (ranges are unchanged)",
+              { scale: HORIZON_HEIGHT_EXAGGERATION },
+            ),
         onClick: toggleHeightScale,
       });
       chips.push({
         id: 'reset',
-        label: 'RESET',
+        label: t('RESET'),
         state: 'idle',
         disabled: snapshot.buffered === 0,
-        title: 'Forget every position heard so far',
+        title: t('Forget every position heard so far'),
         onClick: reset,
       });
       return {
@@ -446,8 +486,12 @@ export function createReceptionHorizonLayer({
             : band.shortLabel,
           color: band.color,
           blurb: band.directions
-            ? `${band.label}: heard in ${Math.round(band.coverage * 100)}% of directions, out to ${formatRange(band.maxRangeKm)}.`
-            : `${band.label}: nothing heard yet.`,
+            ? t('{band}: heard in {percent}% of directions, out to {range}.', {
+                band: t(band.label),
+                percent: formatNumber(Math.round(band.coverage * 100)),
+                range: formatRange(band.maxRangeKm),
+              })
+            : t('{band}: nothing heard yet.', { band: t(band.label) }),
         })),
         info: receptionHorizonInfo(snapshot, antenna, {
           armed,

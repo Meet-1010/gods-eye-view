@@ -268,7 +268,9 @@ test('an unreadable receiver.json is unreachable, and positions are cached for a
     lat: 51.5,
     lon: -0.12,
   });
-  assert.equal((await callPosition(handler, 'POST')).status, 405);
+  const refused = await callPosition(handler, 'POST');
+  assert.equal(refused.status, 405);
+  assert.equal(refused.headers.Allow, 'GET, HEAD', '405 declares the methods');
 });
 
 test('an unconfigured receiver route answers without fetching anything', async (t) => {
