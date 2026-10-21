@@ -1,6 +1,6 @@
 import { bearingBetweenCoordinates } from '../../cockpitMath.js';
 import { projectPoint } from '../../data/cctvFootprint.js';
-import { greatCircleKm } from '../../data/routePlausible.js';
+import { greatCircleKm } from '../../geoDistance.js';
 import {
   HORIZON_ANTENNA_EPSILON_M,
   HORIZON_BANDS,
@@ -205,7 +205,7 @@ export function createHorizonModel({
   function apply(fix) {
     const band = horizonBandIndex(fix.altitudeFt, bands);
     if (band < 0) return false;
-    const rangeKm = greatCircleKm(antenna.lat, antenna.lon, fix.lat, fix.lon);
+    const rangeKm = greatCircleKm(antenna, fix);
     if (!Number.isFinite(rangeKm) || rangeKm > maxRangeKm) {
       implausible += 1;
       return false;
@@ -280,8 +280,7 @@ export function createHorizonModel({
       if (
         next &&
         antenna &&
-        greatCircleKm(antenna.lat, antenna.lon, next.lat, next.lon) * 1000 <
-          antennaEpsilonM
+        greatCircleKm(antenna, next) * 1000 < antennaEpsilonM
       )
         return false;
       antenna = next;

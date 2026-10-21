@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { destinationPointDeg } from '../alpr/model.js';
-import { greatCircleKm } from '../../data/routePlausible.js';
+import { greatCircleKm } from '../../geoDistance.js';
 import {
   createHorizonModel,
   horizonArcs,
@@ -210,11 +210,7 @@ test('the outline sweeps between heard directions instead of cutting a chord', (
   // Halfway between 90° @ 100 km and 100° @ 200 km the outline is at 95° and
   // 150 km; a straight chord would pass well inside that.
   const middle = path[5];
-  assert.ok(
-    Math.abs(
-      greatCircleKm(ANTENNA.lat, ANTENNA.lon, middle.lat, middle.lon) - 150,
-    ) < 1,
-  );
+  assert.ok(Math.abs(greatCircleKm(ANTENNA, middle) - 150) < 1);
 
   const ring = createHorizonModel();
   ring.setAntenna(ANTENNA);
@@ -226,11 +222,7 @@ test('the outline sweeps between heard directions instead of cutting a chord', (
   assert.equal(loop.length, 72 * 5 + 1);
   assert.deepEqual(loop.at(-1), loop[0], 'a closed ring returns to its start');
   for (const point of loop)
-    assert.ok(
-      Math.abs(
-        greatCircleKm(ANTENNA.lat, ANTENNA.lon, point.lat, point.lon) - 300,
-      ) < 2,
-    );
+    assert.ok(Math.abs(greatCircleKm(ANTENNA, point) - 300) < 2);
 });
 
 test('moving the antenna rebuilds the horizon around the new centre', () => {
